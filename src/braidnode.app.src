@@ -1,0 +1,16 @@
+{application, braidnode,
+ [{description, "Otp App to connect to a braidnet orchestrator"},
+  {vsn, "0.1.0"},
+  {registered, []},
+  {mod, {braidnode_app, []}},
+  {applications,
+   [kernel,
+    stdlib,
+    gun
+   ]},
+  {env,[]},
+  {modules, []},
+
+  {licenses, ["Apache-2.0"]},
+  {links, []}
+ ]}.

@@ -1,13 +1,13 @@
 -module(braidnode_client).
 
+-export([start_link/0]).
+
 -behaviour(gen_server).
 
 -export([init/1,
          handle_call/3,
          handle_cast/2,
          handle_info/2]).
-
--export([start_link/0]).
 
 -include_lib("kernel/include/logger.hrl").
 
@@ -24,7 +24,7 @@ start_link() ->
 init([]) ->
     {ok, Domain} = application:get_env(domain),
     {ok, Port} = application:get_env(port),
-    {ok, ContainerID} = inet:gethostname(),
+    ContainerID = parse_container_id(),
 
     {ok, ConnPid} = gun:open(Domain, Port),
     {ok, http} = gun:await_up(ConnPid),
@@ -47,3 +47,13 @@ handle_info({gun_error, ConnPid, StreamRef, Reason}, S) ->
 handle_info(Msg, S) ->
     ?LOG_DEBUG("Unexpected ws msg: ~p",[Msg]),
     {noreply, S}.
+
+
+parse_container_id() ->
+    % Very much non portable, but only way if the container is using the host network
+    % In normal cases inet:gethostname() would hold the short container ID
+    Line = os:cmd("cat /proc/self/mountinfo | "
+                  "grep \"/docker/containers/\" | "
+                  "head -1 | awk '{print $4}' "),
+    [_, "docker", "containers", ID | _] = string:split(string:trim(Line), "/", all),
+    ID.

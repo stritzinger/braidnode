@@ -1,13 +1,14 @@
 # braidnode
 
-An OTP application to connect with a local braidnet instance and provide a transport for the Erlang Distribution traffic of the current node.
+An OTP application to connect with a local braidnet instance and setup Erlang Distribution for the current Node.
 
 ## Run without container
------
 
     rebar3 shell
 
-## Run as docker container
+## Run as docker container with shell
 
-    rebar3 as container docker build
-    docker run -ti local/braidnode
+You need to change the rebar3_docker dockerfile template to access the erlang console
+
+    rebar3 docker build
+    docker run -ti --network host local/braidnode

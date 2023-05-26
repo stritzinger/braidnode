@@ -37,15 +37,21 @@ handle_call(_, _, S) ->
 handle_cast(_, S) ->
     {noreply, S}.
 
-handle_info({gun_upgrade, ConnPid, StreamRef, [<<"websocket">>], Headers}, S) ->
+handle_info({gun_upgrade, ConnPid, StreamRef, [<<"websocket">>], Headers},
+            #state{conn_pid = ConnPid, stream_ref = StreamRef} = S) ->
     ?LOG_NOTICE("Success in reaching the host!"),
     {noreply, S};
-handle_info({gun_response, ConnPid, _, _, Status, Headers}, S) ->
+handle_info({gun_response, ConnPid, _, _, Status, Headers},
+            #state{conn_pid = ConnPid}) ->
     exit({ws_upgrade_failed, Status, Headers});
-handle_info({gun_error, ConnPid, StreamRef, Reason}, S) ->
-   exit({ws_upgrade_failed, Reason});
+handle_info({gun_error, ConnPid, StreamRef, Reason},
+            #state{conn_pid = ConnPid, stream_ref = StreamRef}) ->
+    exit({ws_upgrade_failed, Reason});
+handle_info({gun_down, ConnPid, ws, closed, _},
+            #state{conn_pid = ConnPid}) ->
+    exit({error, gun_down});
 handle_info(Msg, S) ->
-    ?LOG_DEBUG("Unexpected ws msg: ~p",[Msg]),
+    ?LOG_ERROR("Unexpected ws msg: ~p",[Msg]),
     {noreply, S}.
 
 

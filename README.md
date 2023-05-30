@@ -12,3 +12,5 @@ You need to change the rebar3_docker dockerfile template to access the erlang co
 
     rebar3 docker build
     docker run -ti --network host local/braidnode
+    docker run -d local/braidnode
+    docker exec -ti interesting_edison /opt/braidnode/bin/braidnode remote_console

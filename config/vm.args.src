@@ -1,0 +1,6 @@
+## Name of the node
+-name ${NODE_NAME}
+
+## Cookie for distributed Erlang
+-setcookie cookie
+-epmd_module braidnode_epmd

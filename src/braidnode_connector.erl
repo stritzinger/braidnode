@@ -13,14 +13,14 @@
 ]).
 
 -export([
-    ping_nodes/0
+    add_node_to_braidnet/0
 ]).
 
 start_link() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
-ping_nodes() ->
-    gen_server:cast(?MODULE, ping_nodes).
+add_node_to_braidnet() ->
+    gen_server:cast(?MODULE, ?FUNCTION_NAME).
 
 init([]) ->
     {ok, []}.
@@ -28,11 +28,9 @@ init([]) ->
 handle_call(_Request, _From, State) ->
     {reply, ok, State}.
 
-handle_cast(ping_nodes, State) ->
-    Nodes = braidnode_epmd:get_connections(),
-    lists:foreach(fun(Node) ->
-        ?LOG_NOTICE("~n~p pings ~p: ~p~n", [node(), Node, net_adm:ping(Node)])
-    end, Nodes),
+handle_cast(add_node_to_braidnet, State) ->
+    {ok, Connections} = braidnode_epmd:register_with_braidnet(),
+    ping_nodes(Connections),
     {noreply, State};
 
 handle_cast(_Request, State) ->
@@ -40,3 +38,8 @@ handle_cast(_Request, State) ->
 
 handle_info(_Request, State) ->
     {noreply, State}.
+
+ping_nodes(Connections) ->
+    lists:foreach(fun(Node) ->
+        ?LOG_NOTICE("~p pings ~p: ~p~n", [node(), Node, net_adm:ping(Node)])
+    end, Connections).

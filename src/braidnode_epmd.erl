@@ -6,6 +6,10 @@
 
 -behaviour(gen_server).
 
+-export([
+    register_with_braidnet/0
+]).
+
 % gen_server API
 -export([
     init/1,
@@ -13,9 +17,6 @@
     handle_cast/2,
     handle_info/2
 ]).
-
--export([ready/0]).
--export([get_connections/0]).
 
 % EPMD API
 -export([
@@ -37,10 +38,7 @@
     connections
 }).
 
-ready() ->
-    gen_server:cast(?MODULE, ?FUNCTION_NAME).
-
-get_connections() ->
+register_with_braidnet() ->
     gen_server:call(?MODULE, ?FUNCTION_NAME).
 
 % 1st call at app startup.
@@ -55,25 +53,24 @@ listen_port_please(Name, Host) ->
 register_node(Name, Port, Driver) ->
     gen_server:call(?MODULE, {?FUNCTION_NAME, Name, Port, Driver}).
 
-% Unused
+% Unused but exported for easier debugging.
 register_node(_Name, _Port) ->
-    erlang:error(unexpected_call).
+    erlang:error({unexpected_call, 'register_node/2'}).
 
-% 1st call when connecting to a node
+% Called when connecting to a node
 address_please(Name, Host, AddressFamily) ->
-    ?LOG_NOTICE("CALLING ~p~n", [?FUNCTION_NAME]),
     gen_server:call(?MODULE, {?FUNCTION_NAME, Name, Host, AddressFamily}).
 
-% 2nd call when connecting to a node
-port_please(Name, Host) ->
-    ?LOG_NOTICE("CALLING ~p~n", [?FUNCTION_NAME]),
-    gen_server:call(?MODULE, {?FUNCTION_NAME, Name, Host}).
+% Unused but exported for easier debugging.
+port_please(_Name, _Host) ->
+    erlang:error({unexpected_call, 'port_please/2'}).
 
+% Unused but exported for easier debugging.
 port_please(_Name, _Host, _Timeout) ->
-    erlang:error(unexpected_call).
+    erlang:error({unexpected_call, 'port_please/3'}).
 
+% Called by net_adm:names/0.
 names(Host) ->
-    ?LOG_NOTICE("CALLING ~p~n", [?FUNCTION_NAME]),
     gen_server:call(?MODULE, {?FUNCTION_NAME, Host}).
 
 init([]) ->
@@ -94,64 +91,38 @@ handle_call({register_node, Name, Port, _Driver}, _, _) ->
     {reply, {ok, 1}, State1};
 
 handle_call({address_please = M, Name, Host, _AddressFamily}, _, State) ->
+    % Although the official documentation states that the version of the
+    % distribution protocol "has been 5 since Erlang/OTP R6",
+    % erl_epmd:port_please/2 actually returns version 6.
+    % So that's what we are using too.
+    Version = 6,
     Method = atom_to_binary(M),
-    Params = #{
-        name => Name,
-        host => Host
-    },
+    Params = #{name => Name, host => Host },
     case braidnode_client:send_receive(Method, Params) of
         [<<"ok">>, Address, Port] ->
-            {reply, {ok, erlang:list_to_tuple(Address), Port, 6}, State};
+            {reply, {ok, erlang:list_to_tuple(Address), Port, Version}, State};
         [<<"error">>, <<"unknown">>] ->
             {reply, {error, unknown}, State};
         [<<"error">>, <<"nxdomain">>] ->
             {reply, {error, nxdomain}, State}
     end;
 
-handle_call({port_please = M, Name, Host}, _, State) when is_tuple(Host) -> % TODO
-    ?LOG_NOTICE("Port Please! ~p, ~p", [Name, Host]),
-    Method = atom_to_binary(M),
-    Params = #{
-        name => list_to_binary(Name),
-        host => erlang:tuple_to_list(Host)
-    },
-    case braidnode_client:send_receive(Method, Params) of
-        [<<"ok">>, Port] ->
-            {reply, {port, Port, 6}, State};  % TODO
-        [<<"ok">>, <<"noport">>] -> {reply, noport, State}
-    end;
-
 handle_call({names = M, Host}, _, State) ->
     Method = atom_to_binary(M),
-    Params = #{
-        host => Host
-    },
+    Params = #{host => Host},
     [<<"ok">>, Names] = braidnode_client:send_receive(Method, Params),
     {reply, {ok, Names}, State};
 
-handle_call(get_connections, _, #state{connections = Connections} = State) ->
-    {reply, Connections, State};
+handle_call(register_with_braidnet, _, State) ->
+    Method = <<"register_node">>,
+    Params = #{name => State#state.name, port => State#state.port},
+    [<<"ok">>, Connections] = braidnode_client:send_receive(Method, Params),
+    Nodes = [erlang:binary_to_atom(N) || N <- Connections],
+    {reply, {ok, Nodes}, State};
 
 handle_call(Msg, _From, S) ->
     ?LOG_ERROR("Unexpected call: ~p",[Msg]),
     {reply, ok, S}.
-
-handle_cast(ready, State) ->
-    % --- register node
-    Params = #{
-        name => State#state.name,
-        port => State#state.port
-    },
-    <<"ok">> = braidnode_client:send_receive(<<"register_node">>, Params),
-    % ---
-    [<<"ok">>, Connections] = braidnode_client:send_receive(<<"connections">>, [node()]),
-
-    Nodes = [erlang:binary_to_atom(N) || N <- Connections],
-    ?LOG_NOTICE("Received nodes: ~p~n", [Nodes]),
-
-    braidnode_connector:ping_nodes(),
-
-    {noreply, State#state{connections = Nodes}};
 
 handle_cast(Msg, S) ->
     ?LOG_ERROR("Unexpected cast: ~p",[Msg]),

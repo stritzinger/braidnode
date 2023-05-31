@@ -69,8 +69,8 @@ handle_info({gun_ws, ConnPid, _, {binary, Frame}}, #state{conn_pid = ConnPid} = 
 handle_info({gun_upgrade, ConnPid, StreamRef, [<<"websocket">>], Headers},
             #state{conn_pid = ConnPid, stream_ref = StreamRef} = S) ->
     ?LOG_NOTICE("Success in reaching the host!"),
-    braidnode_epmd:ready(),
-    timer:send_interval(10_000, ping), % TODO: adjust timing
+    braidnode_connector:add_node_to_braidnet(),
+    timer:send_interval(50_000, ping), % Default Cowboy timeout: 60_000
     {noreply, #state{conn_pid = ConnPid, stream_ref = StreamRef}};
 
 handle_info({gun_response, ConnPid, _, _, Status, Headers},

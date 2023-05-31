@@ -34,8 +34,7 @@
 
 -record(state, {
     name,
-    port,
-    connections
+    port
 }).
 
 register_with_braidnet() ->

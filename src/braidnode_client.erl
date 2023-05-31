@@ -93,7 +93,7 @@ handle_info(ping, #state{conn_pid = ConnPid, stream_ref = StreamRef} = S) ->
     {noreply, S};
 
 handle_info(Msg, S) ->
-    ?LOG_ERROR("Unexpected ws msg: ~p",[Msg]),
+    ?LOG_ERROR("Unexpected ws msg: ~p~n",[Msg]),
     {noreply, S}.
 
 

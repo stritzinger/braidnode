@@ -56,7 +56,7 @@ register_node(Name, Port, Driver) ->
 register_node(_Name, _Port) ->
     erlang:error({unexpected_call, 'register_node/2'}).
 
-% Called when connecting to a node
+% Called when connecting to a node.
 address_please(Name, Host, AddressFamily) ->
     gen_server:call(?MODULE, {?FUNCTION_NAME, Name, Host, AddressFamily}).
 
@@ -108,9 +108,9 @@ handle_call({address_please = M, Name, Host, _AddressFamily}, _, State) ->
 
 handle_call({names = M, Host}, _, State) ->
     Method = atom_to_binary(M),
-    Params = #{host => Host},
+    Params = #{host => Host, node => node()},
     [<<"ok">>, Names] = braidnode_client:send_receive(Method, Params),
-    {reply, {ok, Names}, State};
+    {reply, {ok, maps:to_list(Names)}, State};
 
 handle_call(register_with_braidnet, _, State) ->
     Method = <<"register_node">>,

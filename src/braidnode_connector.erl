@@ -42,4 +42,5 @@ handle_info(_Request, State) ->
 ping_nodes(Connections) ->
     lists:foreach(fun(Node) ->
         ?LOG_NOTICE("~p pings ~p: ~p~n", [node(), Node, net_adm:ping(Node)])
-    end, Connections).
+    end, Connections),
+    ?LOG_NOTICE("Names: ~p~n", [net_adm:names()]).

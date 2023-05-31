@@ -1,5 +1,9 @@
 -module(braidnode_epmd).
 
+% @doc This module replaces the built-in erl_epmd module.
+% It communicates with the braidnet_epmd_server module of
+% the local Braidnet instance to connect to other Braidnode nodes.
+
 -behaviour(gen_server).
 
 % gen_server API
@@ -95,11 +99,17 @@ handle_call({address_please = M, Name, Host, _AddressFamily}, _, State) ->
         name => Name,
         host => Host
     },
-    [<<"ok">>, Address] = braidnode_client:send_receive(Method, Params),
-
-    {reply, {ok, erlang:list_to_tuple(Address)}, State};
+    case braidnode_client:send_receive(Method, Params) of
+        [<<"ok">>, Address, Port] ->
+            {reply, {ok, erlang:list_to_tuple(Address), Port, 6}, State};
+        [<<"error">>, <<"unknown">>] ->
+            {reply, {error, unknown}, State};
+        [<<"error">>, <<"nxdomain">>] ->
+            {reply, {error, nxdomain}, State}
+    end;
 
 handle_call({port_please = M, Name, Host}, _, State) when is_tuple(Host) -> % TODO
+    ?LOG_NOTICE("Port Please! ~p, ~p", [Name, Host]),
     Method = atom_to_binary(M),
     Params = #{
         name => list_to_binary(Name),
@@ -107,7 +117,6 @@ handle_call({port_please = M, Name, Host}, _, State) when is_tuple(Host) -> % TO
     },
     case braidnode_client:send_receive(Method, Params) of
         [<<"ok">>, Port] ->
-            ?LOG_NOTICE("Got ~p: ~p~n", [?FUNCTION_NAME, Port]),
             {reply, {port, Port, 6}, State};  % TODO
         [<<"ok">>, <<"noport">>] -> {reply, noport, State}
     end;

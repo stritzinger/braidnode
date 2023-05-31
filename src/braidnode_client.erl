@@ -18,7 +18,9 @@
 
 -record(state, {
     conn_pid,
-    stream_ref
+    stream_ref,
+    % pending synchronous gen_server requests:
+    pending = #{} :: #{RequestId :: bitstring() := From :: pid()}
 }).
 
 start_link() ->
@@ -43,16 +45,26 @@ init([]) ->
     %       to ensure that Braidnode is ready by the time the user app starts.
     {ok, #state{conn_pid = ConnPid, stream_ref = StreamRef}}.
 
-handle_call({send_receive, Method, Params}, _From,
-#state{conn_pid = ConnPid, stream_ref = StreamRef} = State) ->
-    Resp = handle_send_receive(Method, Params, ConnPid, StreamRef),
-    {reply, Resp, State};
+handle_call({send_receive, Method, Params}, From, State) ->
+    #state{conn_pid = ConnPid, stream_ref = StreamRef} = State,
+    {RequestId, RequestObj} = jsonrpc_request_object(Method, Params),
+    ok = gun:ws_send(ConnPid, StreamRef, {binary, RequestObj}),
+    Pending = maps:put(RequestId, From, State#state.pending),
+    {noreply, State#state{pending = Pending}};
 
 handle_call(_, _, S) ->
     {reply, ok, S}.
 
 handle_cast(_, S) ->
     {noreply, S}.
+
+handle_info({gun_ws, ConnPid, _, {binary, Frame}}, #state{conn_pid = ConnPid} = State) ->
+    #{<<"result">> := Result,
+      <<"id">> := Id
+    } = jiffy:decode(Frame, [return_maps]),
+    {From, Pending} = maps:take(Id, State#state.pending),
+    gen_server:reply(From, Result),
+    {noreply, State#state{pending = Pending}};
 
 handle_info({gun_upgrade, ConnPid, StreamRef, [<<"websocket">>], Headers},
             #state{conn_pid = ConnPid, stream_ref = StreamRef} = S) ->
@@ -84,24 +96,18 @@ handle_info(Msg, S) ->
     ?LOG_ERROR("Unexpected ws msg: ~p",[Msg]),
     {noreply, S}.
 
-handle_send_receive(Method, Params, ConnPid, StreamRef) ->
-    RequestObj = jsonrpc_request_object(Method, Params),
-    gun:ws_send(ConnPid, StreamRef, {binary, RequestObj}),
-    receive
-        {gun_ws, ConnPid, StreamRef, {binary, Frame}} ->
-            ResponseObj = jiffy:decode(Frame, [return_maps]),
-            maps:get(<<"result">>, ResponseObj)
-    end.
 
--spec jsonrpc_request_object(binary(), term() | undefined) -> jiffy:json_value().
+-spec jsonrpc_request_object(binary(), term() | undefined) ->
+    {Id :: bitstring(), Object :: jiffy:json_value()}.
 jsonrpc_request_object(Method, Params) ->
+    Id = uuid:uuid_to_string(uuid:get_v4(), binary_standard),
     Map1 = #{
         <<"jsonrpc">> => <<"2.0">>,
-        <<"id">> => uuid:uuid_to_string(uuid:get_v4(), binary_standard),
+        <<"id">> => Id,
         <<"method">> => Method
     },
     Map2 = case Params of
         undefined -> Map1;
         _ -> maps:put(<<"params">>, Params, Map1)
     end,
-    jiffy:encode(Map2).
+    {Id, jiffy:encode(Map2)}.

@@ -10,6 +10,8 @@
          handle_info/2]).
 
 -export([
+    notify/1,
+    notify/2,
     send_receive/1,
     send_receive/2
 ]).
@@ -20,14 +22,21 @@
     conn_pid,
     stream_ref,
     % pending synchronous gen_server requests:
-    pending = #{} :: #{RequestId :: bitstring() := From :: pid()}
+    pending = #{} :: #{RequestId :: bitstring() := From :: pid()},
+    connected = false   :: true | false
 }).
 
 start_link() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
+notify(Method) ->
+    notify(Method, undefined).
+
+notify(Method, Params) ->
+    gen_server:cast(?MODULE, {?FUNCTION_NAME, Method, Params}).
+
 send_receive(Method) ->
-    gen_server:call(?MODULE, {?FUNCTION_NAME, Method, undefined}).
+    send_receive(Method, undefined).
 
 send_receive(Method, Params) ->
     gen_server:call(?MODULE, {?FUNCTION_NAME, Method, Params}).
@@ -47,7 +56,7 @@ init([]) ->
 
 handle_call({send_receive, Method, Params}, From, State) ->
     #state{conn_pid = ConnPid, stream_ref = StreamRef} = State,
-    {RequestId, RequestObj} = jsonrpc_request_object(Method, Params),
+    {RequestId, RequestObj} = jsonrpc_object(request, Method, Params),
     ok = gun:ws_send(ConnPid, StreamRef, {binary, RequestObj}),
     Pending = maps:put(RequestId, From, State#state.pending),
     {noreply, State#state{pending = Pending}};
@@ -55,6 +64,10 @@ handle_call({send_receive, Method, Params}, From, State) ->
 handle_call(_, _, S) ->
     {reply, ok, S}.
 
+handle_cast({notify, Method, Params},
+#state{conn_pid = ConnPid, stream_ref = StreamRef, connected = true} = State) ->
+    handle_notify(Method, Params, ConnPid, StreamRef),
+    {noreply, State};
 handle_cast(_, S) ->
     {noreply, S}.
 
@@ -66,12 +79,12 @@ handle_info({gun_ws, ConnPid, _, {binary, Frame}}, #state{conn_pid = ConnPid} = 
     gen_server:reply(From, Result),
     {noreply, State#state{pending = Pending}};
 
-handle_info({gun_upgrade, ConnPid, StreamRef, [<<"websocket">>], Headers},
+handle_info({gun_upgrade, ConnPid, StreamRef, [<<"websocket">>], _Headers},
             #state{conn_pid = ConnPid, stream_ref = StreamRef} = S) ->
     ?LOG_NOTICE("Success in reaching the host!"),
     braidnode_connector:add_node_to_braidnet(),
     timer:send_interval(50_000, ping), % Default Cowboy timeout: 60_000
-    {noreply, #state{conn_pid = ConnPid, stream_ref = StreamRef}};
+    {noreply, S#state{connected = true}};
 
 handle_info({gun_response, ConnPid, _, _, Status, Headers},
             #state{conn_pid = ConnPid}) ->
@@ -96,18 +109,26 @@ handle_info(Msg, S) ->
     ?LOG_ERROR("Unexpected ws msg: ~p~n",[Msg]),
     {noreply, S}.
 
+handle_notify(Method, Params, ConnPid, StreamRef) ->
+    RequestObj = jsonrpc_object(notification, Method, Params),
+    gun:ws_send(ConnPid, StreamRef, {binary, RequestObj}).
 
--spec jsonrpc_request_object(binary(), term() | undefined) ->
-    {Id :: bitstring(), Object :: jiffy:json_value()}.
-jsonrpc_request_object(Method, Params) ->
-    Id = uuid:uuid_to_string(uuid:get_v4(), binary_standard),
+-spec jsonrpc_object(request | notifination,
+                             binary(),
+                             term() | undefined) -> jiffy:json_value().
+jsonrpc_object(Type, Method, Params) ->
     Map1 = #{
         <<"jsonrpc">> => <<"2.0">>,
-        <<"id">> => Id,
         <<"method">> => Method
     },
     Map2 = case Params of
         undefined -> Map1;
         _ -> maps:put(<<"params">>, Params, Map1)
     end,
-    {Id, jiffy:encode(Map2)}.
+    ID = uuid:uuid_to_string(uuid:get_v4(), binary_standard),
+     case Type of
+        request ->
+            {ID,  jiffy:encode(maps:put(<<"id">>, ID, Map2))};
+        notification ->
+            jiffy:encode(Map2)
+    end.

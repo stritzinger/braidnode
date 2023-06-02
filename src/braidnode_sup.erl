@@ -30,7 +30,10 @@ init([]) ->
     SupFlags = #{strategy => one_for_all,
                  intensity => 0,
                  period => 1},
-    ChildSpecs = [worker(braidnode_client, [])],
+    ChildSpecs = [
+        worker(braidnode_client, []),
+        worker(braidnode_connector, [])
+    ],
     {ok, {SupFlags, ChildSpecs}}.
 
 %% internal functions

@@ -21,7 +21,7 @@
 -record(state, {
     conn_pid,
     stream_ref,
-    % pending synchronous gen_server requests:
+    % pending outgoing synchronous gen_server requests:
     pending = #{} :: #{RequestId :: bitstring() := From :: pid()},
     connected = false   :: true | false
 }).
@@ -66,18 +66,13 @@ handle_call(_, _, S) ->
 
 handle_cast({notify, Method, Params},
 #state{conn_pid = ConnPid, stream_ref = StreamRef, connected = true} = State) ->
-    handle_notify(Method, Params, ConnPid, StreamRef),
+    do_notify(Method, Params, ConnPid, StreamRef),
     {noreply, State};
 handle_cast(_, S) ->
     {noreply, S}.
 
 handle_info({gun_ws, ConnPid, _, {binary, Frame}}, #state{conn_pid = ConnPid} = State) ->
-    #{<<"result">> := Result,
-      <<"id">> := Id
-    } = jiffy:decode(Frame, [return_maps]),
-    {From, Pending} = maps:take(Id, State#state.pending),
-    gen_server:reply(From, Result),
-    {noreply, State#state{pending = Pending}};
+    {noreply, handle_jsonrpc(Frame, State)};
 
 handle_info({gun_upgrade, ConnPid, StreamRef, [<<"websocket">>], _Headers},
             #state{conn_pid = ConnPid, stream_ref = StreamRef} = S) ->
@@ -109,7 +104,7 @@ handle_info(Msg, S) ->
     ?LOG_ERROR("Unexpected ws msg: ~p~n",[Msg]),
     {noreply, S}.
 
-handle_notify(Method, Params, ConnPid, StreamRef) ->
+do_notify(Method, Params, ConnPid, StreamRef) ->
     RequestObj = jsonrpc_object(notification, Method, Params),
     gun:ws_send(ConnPid, StreamRef, {binary, RequestObj}).
 
@@ -125,10 +120,23 @@ jsonrpc_object(Type, Method, Params) ->
         undefined -> Map1;
         _ -> maps:put(<<"params">>, Params, Map1)
     end,
-    ID = uuid:uuid_to_string(uuid:get_v4(), binary_standard),
      case Type of
         request ->
+            ID = uuid:uuid_to_string(uuid:get_v4(), binary_standard),
             {ID,  jiffy:encode(maps:put(<<"id">>, ID, Map2))};
         notification ->
             jiffy:encode(Map2)
     end.
+
+
+handle_jsonrpc(Frame, S) ->
+    case jiffy:decode(Frame, [return_maps]) of
+        #{<<"result">> := Result, <<"id">> := Id} = R ->
+            {From, Pending} = maps:take(Id, S#state.pending),
+            gen_server:reply(From, Result),
+            S#state{pending = Pending};
+        #{<<"method">> := <<"shutdown">>} ->
+            init:stop(),
+            S
+    end.
+

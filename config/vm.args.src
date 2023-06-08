@@ -1,3 +1,4 @@
--name ${NODE_NAME}@${HOSTNAME}
+-name ${NODE_NAME}@${NODE_HOST}
 -setcookie cookie
+-proto_dist inet6_tcp
 -epmd_module braidnode_epmd

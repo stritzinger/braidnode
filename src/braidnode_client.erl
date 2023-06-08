@@ -22,7 +22,7 @@
     conn_pid,
     stream_ref,
     % pending outgoing synchronous gen_server requests:
-    pending = #{} :: #{RequestId :: bitstring() := From :: pid()},
+    pending = #{} :: #{RequestId :: binary() := From :: pid()},
     connected = false   :: true | false
 }).
 
@@ -77,7 +77,7 @@ handle_info({gun_ws, ConnPid, _, {binary, Frame}}, #state{conn_pid = ConnPid} = 
 handle_info({gun_upgrade, ConnPid, StreamRef, [<<"websocket">>], _Headers},
             #state{conn_pid = ConnPid, stream_ref = StreamRef} = S) ->
     ?LOG_NOTICE("Success in reaching the host!"),
-    braidnode_connector:add_node_to_braidnet(),
+    braidnode_connector:add_node_to_cluster(),
     timer:send_interval(50_000, ping), % Default Cowboy timeout: 60_000
     {noreply, S#state{connected = true}};
 
@@ -139,4 +139,3 @@ handle_jsonrpc(Frame, S) ->
             init:stop(),
             S
     end.
-

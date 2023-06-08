@@ -13,13 +13,13 @@
 ]).
 
 -export([
-    add_node_to_braidnet/0
+    add_node_to_cluster/0
 ]).
 
 start_link() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
-add_node_to_braidnet() ->
+add_node_to_cluster() ->
     gen_server:cast(?MODULE, ?FUNCTION_NAME).
 
 init([]) ->
@@ -28,7 +28,7 @@ init([]) ->
 handle_call(_Request, _From, State) ->
     {reply, ok, State}.
 
-handle_cast(add_node_to_braidnet, State) ->
+handle_cast(add_node_to_cluster, State) ->
     {ok, Connections} = braidnode_epmd:register_with_braidnet(),
     ping_nodes(Connections),
     {noreply, State};

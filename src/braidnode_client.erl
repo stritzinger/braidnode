@@ -136,6 +136,7 @@ handle_jsonrpc(Frame, S) ->
             gen_server:reply(From, Result),
             S#state{pending = Pending};
         #{<<"method">> := <<"shutdown">>} ->
+            ?LOG_DEBUG("Reveived shutdown!"),
             init:stop(),
             S
     end.

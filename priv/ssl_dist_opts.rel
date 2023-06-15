@@ -2,13 +2,17 @@
     {server, [
         {cacertfile, "/mnt/certs/braidnet.local.CA.pem"},
         {certfile, "/mnt/certs/braidnet.local.pem"},
+        {verify, verify_none},
+        {fail_if_no_peer_cert, false},
         {key, #{
             algorithm => rsa,
             sign_fun => {braidnode_crypto, sign_fun}
         }}
     ]},
     {client, [
+        {cacertfile, "/mnt/certs/braidnet.local.CA.pem"},
         {certfile, "/mnt/certs/braidnet.local.pem"},
+        {verify, verify_none},
         {key, #{
             algorithm => rsa,
             sign_fun => {braidnode_crypto, sign_fun}

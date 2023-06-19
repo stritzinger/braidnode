@@ -9,7 +9,6 @@
 
 -export([start/2, stop/1]).
 
-
 start(_StartType, _StartArgs) ->
     braidnode_sup:start_link().
 

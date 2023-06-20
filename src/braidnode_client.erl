@@ -71,8 +71,15 @@ handle_cast({notify, Method, Params},
 handle_cast(_, S) ->
     {noreply, S}.
 
-handle_info({gun_ws, ConnPid, _, {binary, Frame}}, #state{conn_pid = ConnPid} = State) ->
-    {noreply, handle_jsonrpc(Frame, State)};
+handle_info({gun_ws, ConnPid, _, {binary, Frame}},
+            #state{conn_pid = ConnPid, stream_ref = StreamRef} = State) ->
+    case handle_jsonrpc(Frame, State) of
+        {ok, S} ->
+            {noreply, S};
+        {responce, R, S} ->
+            ok = gun:ws_send(ConnPid, StreamRef, {binary, R}),
+            {noreply, S}
+    end;
 
 handle_info({gun_upgrade, ConnPid, StreamRef, [<<"websocket">>], _Headers},
             #state{conn_pid = ConnPid, stream_ref = StreamRef} = S) ->
@@ -131,12 +138,36 @@ jsonrpc_object(Type, Method, Params) ->
 
 handle_jsonrpc(Frame, S) ->
     case jiffy:decode(Frame, [return_maps]) of
-        #{<<"result">> := Result, <<"id">> := Id} = R ->
+        #{<<"result">> := Result, <<"id">> := Id} ->
             {From, Pending} = maps:take(Id, S#state.pending),
             gen_server:reply(From, Result),
-            S#state{pending = Pending};
+            {ok, S#state{pending = Pending}};
         #{<<"method">> := <<"shutdown">>} ->
             ?LOG_DEBUG("Reveived shutdown!"),
             init:stop(),
-            S
+            {ok, S};
+        #{<<"method">> := <<"rpc">>, <<"params">> := Params, <<"id">> :=ID} ->
+            ?LOG_DEBUG("Reveived RPC!"),
+            Return = execute_rpc(Params),
+            {responce, jsonrpc_result(ID, Return), S}
+    end.
+
+jsonrpc_result(ID, Result) ->
+    jiffy:encode(#{
+        jsonrpc => <<"2.0">>,
+        id => ID,
+        result => Result
+    }).
+
+
+execute_rpc(#{<<"m">> := M,<<"f">> := F, <<"a">> := A}) ->
+    try
+        Mod = binary_to_term(base64:decode(M), [safe]),
+        Fun = binary_to_term(base64:decode(F), [safe]),
+        Args = binary_to_term(base64:decode(A), [safe]),
+        erlang:apply(Mod, Fun, Args)
+    catch Ex:Re:Stack ->
+        #{exception => Ex,
+        reason => Re,
+        stack => list_to_binary(io_lib:format("~p", [Stack]))}
     end.

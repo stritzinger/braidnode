@@ -6,7 +6,9 @@
   {applications,
    [kernel,
     stdlib,
-    gun
+    gun,
+    jiffy,
+    uuid
    ]},
   {env,[]},
   {modules, []},

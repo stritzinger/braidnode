@@ -165,7 +165,7 @@ execute_rpc(#{<<"m">> := M,<<"f">> := F, <<"a">> := A}) ->
         Mod = binary_to_term(base64:decode(M), [safe]),
         Fun = binary_to_term(base64:decode(F), [safe]),
         Args = binary_to_term(base64:decode(A), [safe]),
-        erlang:apply(Mod, Fun, Args)
+        base64:encode(term_to_binary(erlang:apply(Mod, Fun, Args)))
     catch Ex:Re:Stack ->
         #{exception => Ex,
         reason => Re,

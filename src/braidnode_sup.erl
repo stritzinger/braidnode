@@ -31,6 +31,7 @@ init([]) ->
                  intensity => 0,
                  period => 1},
     ChildSpecs = [
+        worker(pg, [braidnet]),
         worker(braidnode_client, []),
         worker(braidnode_connector, [])
     ],

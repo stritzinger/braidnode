@@ -26,6 +26,8 @@
     connected = false   :: true | false
 }).
 
+% API --------------------------------------------------------------------------
+
 start_link() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
@@ -111,6 +113,8 @@ handle_info(Msg, S) ->
     ?LOG_ERROR("Unexpected ws msg: ~p~n",[Msg]),
     {noreply, S}.
 
+% INTERNAL ---------------------------------------------------------------------
+
 do_notify(Method, Params, ConnPid, StreamRef) ->
     RequestObj = jsonrpc_object(notification, Method, Params),
     gun:ws_send(ConnPid, StreamRef, {binary, RequestObj}).
@@ -165,9 +169,28 @@ execute_rpc(#{<<"m">> := M,<<"f">> := F, <<"a">> := A}) ->
         Mod = binary_to_term(base64:decode(M), [safe]),
         Fun = binary_to_term(base64:decode(F), [safe]),
         Args = binary_to_term(base64:decode(A), [safe]),
-        base64:encode(term_to_binary(erlang:apply(Mod, Fun, Args)))
+        Pid = self(),
+        spawn(fun() ->
+            R =
+            try
+                erlang:apply(Mod, Fun, Args)
+            catch Ex:Re:Stack ->
+                pack_exception(Ex, Re, Stack)
+            end,
+            Pid ! {rpc_result, R}
+        end),
+        Result = receive
+            {rpc_result, R} -> R
+        after 5000 ->
+            rpc_timeout
+        end,
+        base64:encode(list_to_binary(io_lib:format("~p",[Result])))
     catch Ex:Re:Stack ->
-        #{exception => Ex,
-        reason => Re,
-        stack => list_to_binary(io_lib:format("~p", [Stack]))}
+        pack_exception(Ex, Re, Stack)
     end.
+
+pack_exception(Ex, Re, Stack) ->
+    #{exception => Ex,
+      reason => Re,
+      stack => list_to_binary(io_lib:format("~p", [Stack]))
+    }.

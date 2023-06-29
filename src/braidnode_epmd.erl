@@ -137,17 +137,17 @@ handle_call({address_please = M, Name, Host, _AddressFamily}, _, State) ->
         host => erlang:list_to_binary(Host)
     },
     case braidnode_client:send_receive(Method, Params) of
-        [<<"ok">>, Address, Port] ->
+        #{<<"address">> :=  Address, <<"port">> := Port} ->
             {ok, IP} = inet:parse_address(Address),
             {reply, {ok, IP, Port, Version}, State};
-        [<<"error">>, Error] ->
+        #{<<"error">> := Error} ->
             {reply, {error, binary_to_atom(Error)}, State}
     end;
 
 handle_call({names = M, Host}, _, State) ->
     Method = atom_to_binary(M),
     Params = #{host => erlang:list_to_binary(Host), node => node()},
-    [<<"ok">>, NamesMap] = braidnode_client:send_receive(Method, Params),
+    NamesMap = braidnode_client:send_receive(Method, Params),
     Names = maps:fold(fun(Name, Port, Acc) ->
         [{binary_to_list(Name), Port} | Acc]
     end, [], NamesMap),
@@ -156,8 +156,8 @@ handle_call({names = M, Host}, _, State) ->
 handle_call(register_with_braidnet, _, State) ->
     Method = <<"register_node">>,
     Params = #{name => State#state.name, port => State#state.port},
-    [<<"ok">>, Connections] = braidnode_client:send_receive(Method, Params),
-    Nodes = [erlang:binary_to_atom(N) || N <- Connections],
+    #{<<"connections">> := C} = braidnode_client:send_receive(Method, Params),
+    Nodes = [erlang:binary_to_atom(N) || N <- C],
     {reply, {ok, Nodes}, State};
 
 handle_call(Msg, _From, S) ->

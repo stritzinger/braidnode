@@ -58,8 +58,9 @@ init([]) ->
 
 handle_call({send_receive, Method, Params}, From, State) ->
     #state{conn_pid = ConnPid, stream_ref = StreamRef} = State,
-    {RequestId, RequestObj} = jsonrpc_object(request, Method, Params),
-    ok = gun:ws_send(ConnPid, StreamRef, {binary, RequestObj}),
+    RequestId = id(),
+    Json = braidnode_jsonrpc:call(Method, Params, RequestId),
+    ok = gun:ws_send(ConnPid, StreamRef, {binary, Json}),
     Pending = maps:put(RequestId, From, State#state.pending),
     {noreply, State#state{pending = Pending}};
 
@@ -68,20 +69,31 @@ handle_call(_, _, S) ->
 
 handle_cast({notify, Method, Params},
 #state{conn_pid = ConnPid, stream_ref = StreamRef, connected = true} = State) ->
-    do_notify(Method, Params, ConnPid, StreamRef),
+    Json = braidnode_jsonrpc:notify(Method, Params),
+    ok = gun:ws_send(ConnPid, StreamRef, {binary, Json}),
     {noreply, State};
 handle_cast(_, S) ->
     {noreply, S}.
 
 handle_info({gun_ws, ConnPid, _, {binary, Frame}},
             #state{conn_pid = ConnPid, stream_ref = StreamRef} = State) ->
-    case handle_jsonrpc(Frame, State) of
-        {ok, S} ->
-            {noreply, S};
-        {responce, R, S} ->
-            ok = gun:ws_send(ConnPid, StreamRef, {binary, R}),
-            {noreply, S}
-    end;
+    NewS = case braidnode_jsonrpc:decode(Frame) of
+        {call, Method, Params, ID}->
+            Reply = handle_request(Method, Params, ID),
+            ok = gun:ws_send(ConnPid, StreamRef, {binary, Reply}),
+            State;
+        {notification, Method, Params} ->
+            handle_notification(Method, Params),
+            State;
+        {result, _Result, _ID} = Result ->
+            handle_response(Result, State);
+        {error, _Code, _Message, _Data, _ID} = Error ->
+            handle_response(Error, State);
+        {error, _Reason, EncodedReply} ->
+            ok = gun:ws_send(ConnPid, StreamRef, {binary, EncodedReply}),
+            State
+    end,
+    {noreply, NewS};
 
 handle_info({gun_upgrade, ConnPid, StreamRef, [<<"websocket">>], _Headers},
             #state{conn_pid = ConnPid, stream_ref = StreamRef} = S) ->
@@ -115,54 +127,36 @@ handle_info(Msg, S) ->
 
 % INTERNAL ---------------------------------------------------------------------
 
-do_notify(Method, Params, ConnPid, StreamRef) ->
-    RequestObj = jsonrpc_object(notification, Method, Params),
-    gun:ws_send(ConnPid, StreamRef, {binary, RequestObj}).
-
--spec jsonrpc_object(request | notifination,
-                             binary(),
-                             term() | undefined) -> jiffy:json_value().
-jsonrpc_object(Type, Method, Params) ->
-    Map1 = #{
-        <<"jsonrpc">> => <<"2.0">>,
-        <<"method">> => Method
-    },
-    Map2 = case Params of
-        undefined -> Map1;
-        _ -> maps:put(<<"params">>, Params, Map1)
-    end,
-     case Type of
-        request ->
-            ID = uuid:uuid_to_string(uuid:get_v4(), binary_standard),
-            {ID,  jiffy:encode(maps:put(<<"id">>, ID, Map2))};
-        notification ->
-            jiffy:encode(Map2)
+handle_request(Method,  Params, ID) ->
+    try call_method(Method, Params) of
+        undefined ->  braidnode_jsonrpc:error(method_not_found, ID);
+        Result -> braidnode_jsonrpc:result(Result, ID)
+    catch Ex:Er:Stack ->
+        ?LOG_ERROR("JsonRPC internal error ~p : ~p : ~p",[Ex, Er, Stack]),
+        braidnode_jsonrpc:error(internal_error, ID)
     end.
 
+handle_response({result, Result, ID}, #state{pending = Preqs} = S) ->
+    #{ID := Caller} = Preqs,
+    gen_server:reply(Caller, Result),
+    S#state{pending = maps:remove(ID, Preqs)};
+handle_response({error, _, _, _, ID} = Error,
+                #state{pending = Preqs} = S) ->
+    #{ID := Caller} = Preqs,
+    gen_server:reply(Caller, Error),
+    S#state{pending = maps:remove(ID, Preqs)}.
 
-handle_jsonrpc(Frame, S) ->
-    case jiffy:decode(Frame, [return_maps]) of
-        #{<<"result">> := Result, <<"id">> := Id} ->
-            {From, Pending} = maps:take(Id, S#state.pending),
-            gen_server:reply(From, Result),
-            {ok, S#state{pending = Pending}};
-        #{<<"method">> := <<"shutdown">>} ->
-            ?LOG_DEBUG("Reveived shutdown!"),
-            init:stop(),
-            {ok, S};
-        #{<<"method">> := <<"rpc">>, <<"params">> := Params, <<"id">> :=ID} ->
-            ?LOG_DEBUG("Reveived RPC!"),
-            Return = execute_rpc(Params),
-            {responce, jsonrpc_result(ID, Return), S}
-    end.
+handle_notification(<<"shutdown">>, _Params) ->
+    ?LOG_DEBUG("Reveived shutdown!"),
+    init:stop();
+handle_notification(Method, _) ->
+    ?LOG_WARNING("Unhandled jsonrpc notification method ~p",[Method]).
 
-jsonrpc_result(ID, Result) ->
-    jiffy:encode(#{
-        jsonrpc => <<"2.0">>,
-        id => ID,
-        result => Result
-    }).
-
+call_method(<<"rpc">>, Params) ->
+    ?LOG_DEBUG("Reveived RPC!"),
+    execute_rpc(Params);
+call_method(_, _) ->
+    undefined.
 
 execute_rpc(#{<<"m">> := M,<<"f">> := F, <<"a">> := A}) ->
     try
@@ -194,3 +188,5 @@ pack_exception(Ex, Re, Stack) ->
       reason => Re,
       stack => list_to_binary(io_lib:format("~p", [Stack]))
     }.
+
+id() -> uuid:uuid_to_string(uuid:get_v4(), binary_standard).

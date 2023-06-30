@@ -29,3 +29,8 @@ Make your dockerized release available on dockerhub so that braidnet will be abl
 **This app can only be started as a container by braidnet.**
 
     rebar3 docker build
+
+### A note on the builder image in the template rebar.config
+Braidnode applications are using a modified Erlang/OTP build that allows
+specifying a custom signing function for SSL handshakes.
+This is used to delegate signing, as well as private key handling, to Braidnet.

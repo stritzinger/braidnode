@@ -69,7 +69,7 @@ handle_call(_, _, S) ->
 
 handle_cast({notify, Method, Params},
 #state{conn_pid = ConnPid, stream_ref = StreamRef, connected = true} = State) ->
-    Json = braidnode_jsonrpc:notify(Method, Params),
+    Json = braidnode_jsonrpc:notification(Method, Params),
     ok = gun:ws_send(ConnPid, StreamRef, {binary, Json}),
     {noreply, State};
 handle_cast(_, S) ->

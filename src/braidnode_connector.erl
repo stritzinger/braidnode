@@ -40,17 +40,17 @@ handle_info(_Request, State) ->
     {noreply, State}.
 
 ping_nodes(Connections) ->
-    lists:foreach(fun(Node) -> 
+    lists:foreach(fun(Node) ->
         spawn(fun() -> ping_loop(Node) end)
     end, Connections),
     ?LOG_NOTICE("Names: ~p~n", [net_adm:names()]).
 
 ping_loop(Node) ->
-    Result =  net_adm:ping(Node),
+    Result = net_adm:ping(Node),
     ?LOG_NOTICE("~p pings ~p: ~p~n", [node(), Node, Result]),
     case Result of
-        ping -> ok;
-        pang -> 
+        pong -> ok;
+        pang ->
             timer:sleep(1000),
             ping_loop(Node)
     end.

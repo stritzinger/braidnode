@@ -175,7 +175,7 @@ execute_rpc(#{<<"m">> := M,<<"f">> := F, <<"a">> := A}) ->
         end),
         Result = receive
             {rpc_result, R} -> R
-        after 5000 ->
+        after 20_000 ->
             rpc_timeout
         end,
         base64:encode(list_to_binary(io_lib:format("~p",[Result])))

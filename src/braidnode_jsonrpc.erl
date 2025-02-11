@@ -64,7 +64,7 @@ error(Code, Message, Data, Id) ->
 
 decode(JSON) ->
     try
-        case jiffy:decode(JSON) of
+        case json:decode(JSON) of
             #{<<"jsonrpc">> := <<"2.0">>, <<"method">> := Method} = Decoded ->
                 case get(<<"params">>, Decoded) of
                     Params when

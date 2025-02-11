@@ -64,7 +64,7 @@ error(Code, Message, Data, Id) ->
 
 decode(JSON) ->
     try
-        case jiffy:decode(JSON, [return_maps]) of
+        case jiffy:decode(JSON) of
             #{<<"jsonrpc">> := <<"2.0">>, <<"method">> := Method} = Decoded ->
                 case get(<<"params">>, Decoded) of
                     Params when
@@ -95,7 +95,7 @@ decode(JSON) ->
 decode_error(Reason, Id) -> {error, Reason, error_reply(Reason, Id)}.
 
 encode(Message) ->
-    jiffy:encode(maps:merge(Message, #{jsonrpc => <<"2.0">>})).
+    json:encode(maps:merge(Message, #{jsonrpc => <<"2.0">>})).
 
 error_reply(parse_error, Id) ->
     encode_error(-32700, <<"Parse error">>, Id);
@@ -110,7 +110,7 @@ error_reply(internal_error, Id) ->
 
 encode_error(Code, Message, Id) ->
     Error = #{code => Code, message => Message},
-    jiffy:encode(#{jsonrpc => <<"2.0">>, error => Error, id => Id}).
+    json:encode(#{jsonrpc => <<"2.0">>, error => Error, id => Id}).
 
 id(Map) -> maps:get(<<"id">>, Map, null).
 

@@ -7,7 +7,6 @@
    [kernel,
     stdlib,
     gun,
-    jiffy,
     uuid
    ]},
   {env,[]},

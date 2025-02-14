@@ -10,7 +10,7 @@
         ]}
     ]},
     {client, [
-        {cacertfile, "/mnt/certs/braidcert.CA.pem"},=
+        {cacertfile, "/mnt/certs/braidcert.CA.pem"},
         {verify, verify_peer},
         {certs_keys, [
             #{certfile =>  "/mnt/certs/braidnode.pem",

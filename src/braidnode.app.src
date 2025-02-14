@@ -1,6 +1,6 @@
 {application, braidnode,
  [{description, "Otp App to connect to a braidnet orchestrator"},
-  {vsn, "0.1.0"},
+  {vsn, "0.2.0"},
   {registered, []},
   {mod, {braidnode_app, []}},
   {applications,

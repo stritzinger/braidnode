@@ -1,20 +1,22 @@
 [
     {server, [
         {cacertfile, "/mnt/certs/braidcert.CA.pem"},
-        {certfile, "/mnt/certs/braidnode.pem"},
         {verify, verify_peer},
-        {key, #{
-            algorithm => rsa,
-            sign_fun => {braidnode_crypto, sign_fun}
-        }}
+        {certs_keys, [
+            #{certfile =>  "/mnt/certs/braidnode.pem",
+              key => #{algorithm => rsa,
+                       sign_fun => fun braidnode_crypto:sign_fun/3}
+            }
+        ]}
     ]},
     {client, [
         {cacertfile, "/mnt/certs/braidcert.CA.pem"},
-        {certfile, "/mnt/certs/braidnode.pem"},
         {verify, verify_peer},
-        {key, #{
-            algorithm => rsa,
-            sign_fun => {braidnode_crypto, sign_fun}
-        }}
+        {certs_keys, [
+            #{certfile =>  "/mnt/certs/braidnode.pem",
+              key => #{algorithm => rsa,
+                       sign_fun => fun braidnode_crypto:sign_fun/3}
+            }
+        ]}
     ]}
 ].

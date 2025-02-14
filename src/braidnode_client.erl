@@ -49,7 +49,12 @@ init([]) ->
     {ok, Domain} = application:get_env(braidnet_domain),
     {ok, Port} = application:get_env(braidnet_port),
     ContainerID = os:getenv("CID"),
-    {ok, ConnPid} = gun:open(Domain, Port),
+    GunOpts = #{
+        transport => tls,
+        protocols => [http],
+        tls_opts => tls_opts()
+    },
+    {ok, ConnPid} = gun:open(Domain, Port, GunOpts),
     {ok, http} = gun:await_up(ConnPid, 5000),
     StreamRef = gun:ws_upgrade(ConnPid, "/braidnode", #{id => ContainerID}),
     % TODO: Need to do the node registration with Braidnet here,
@@ -190,3 +195,9 @@ pack_exception(Ex, Re, Stack) ->
     }.
 
 id() -> uuid:uuid_to_string(uuid:get_v4(), binary_standard).
+
+tls_opts() ->
+    [
+        {cacertfile, "/mnt/certs/braidcert.CA.pem"},
+        {verify, verify_peer}
+    ].

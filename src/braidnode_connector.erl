@@ -29,8 +29,14 @@ handle_call(_Request, _From, State) ->
     {reply, ok, State}.
 
 handle_cast(add_node_to_cluster, State) ->
-    {ok, Connections} = braidnode_epmd:register_with_braidnet(),
-    ping_nodes(Connections),
+    case whereis(braidnode_epmd) of
+       undefined ->
+            ?LOG_WARNING("Could not register braidnode to epmd, "
+                         "braidnode_epmd is not running!");
+       _ ->
+            {ok, Connections} = braidnode_epmd:register_with_braidnet(),
+            ping_nodes(Connections)
+    end,
     {noreply, State};
 
 handle_cast(_Request, State) ->

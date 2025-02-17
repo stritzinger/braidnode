@@ -2,11 +2,11 @@
 
 -export([sign_fun/3]).
 
-sign_fun(Msg, DigestType, _Opts) ->
+sign_fun(Msg, DigestType, Options) ->
     Result = braidnode_client:send_receive(sign, #{
         payload => base64:encode(erlang:term_to_binary(Msg)),
         hash_alg => DigestType,
-        sign_alg => rsa
+        sign_options => maps:from_list(Options)
     }),
     case Result of
         Signature when is_binary(Signature) ->

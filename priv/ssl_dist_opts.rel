@@ -2,6 +2,7 @@
     {server, [
         {cacertfile, "/mnt/certs/braidcert.CA.pem"},
         {verify, verify_peer},
+        {fail_if_no_peer_cert, true},
         {certs_keys, [
             #{certfile =>  "/mnt/certs/braidnode.pem",
               key => #{algorithm => rsa,

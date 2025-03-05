@@ -8,7 +8,8 @@
               key => #{algorithm => rsa,
                        sign_fun => fun braidnode_crypto:sign_fun/3}
             }
-        ]}
+        ]},
+        {verify_fun, {fun braidnode_crypto:verify_fun/3, []}}
     ]},
     {client, [
         {cacertfile, "/mnt/certs/CA_certs.pem"},

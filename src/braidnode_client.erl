@@ -198,6 +198,6 @@ id() -> uuid:uuid_to_string(uuid:get_v4(), binary_standard).
 
 tls_opts() ->
     [
-        {cacertfile, "/mnt/certs/braidcert.CA.pem"},
+        {cacertfile, "/mnt/certs/CA_certs.pem"},
         {verify, verify_peer}
     ].

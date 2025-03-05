@@ -1,6 +1,6 @@
 [
     {server, [
-        {cacertfile, "/mnt/certs/braidcert.CA.pem"},
+        {cacertfile, "/mnt/certs/CA_certs.pem"},
         {verify, verify_peer},
         {fail_if_no_peer_cert, true},
         {certs_keys, [
@@ -11,7 +11,7 @@
         ]}
     ]},
     {client, [
-        {cacertfile, "/mnt/certs/braidcert.CA.pem"},
+        {cacertfile, "/mnt/certs/CA_certs.pem"},
         {verify, verify_peer},
         {certs_keys, [
             #{certfile =>  "/mnt/certs/braidnode.pem",

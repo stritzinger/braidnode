@@ -9,7 +9,9 @@
     gun,
     uuid
    ]},
-  {env,[]},
+  {env,[
+    {auto_connect, true}
+  ]},
   {modules, []},
 
   {licenses, ["Apache-2.0"]},

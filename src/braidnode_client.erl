@@ -10,6 +10,7 @@
          handle_info/2]).
 
 -export([
+    connect/0,
     notify/1,
     notify/2,
     send_receive/1,
@@ -31,6 +32,9 @@
 start_link() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
+connect() ->
+    gen_server:cast(?MODULE, ?FUNCTION_NAME).
+
 notify(Method) ->
     notify(Method, undefined).
 
@@ -46,20 +50,11 @@ send_receive(Method, Params) ->
 % gen_server callbacks ---------------------------------------------------------
 
 init([]) ->
-    {ok, Domain} = application:get_env(braidnet_domain),
-    {ok, Port} = application:get_env(braidnet_port),
-    ContainerID = os:getenv("CID"),
-    GunOpts = #{
-        transport => tls,
-        protocols => [http],
-        tls_opts => tls_opts()
-    },
-    {ok, ConnPid} = gun:open(Domain, Port, GunOpts),
-    {ok, http} = gun:await_up(ConnPid, 5000),
-    StreamRef = gun:ws_upgrade(ConnPid, "/braidnode", #{id => ContainerID}),
-    % TODO: Need to do the node registration with Braidnet here,
-    %       to ensure that Braidnode is ready by the time the user app starts.
-    {ok, #state{conn_pid = ConnPid, stream_ref = StreamRef}}.
+    State = case application:get_env(braidnode, auto_connect) of
+        {ok, true} -> init_connection();
+        {ok, false} -> #state{}
+    end,
+    {ok, State}.
 
 handle_call({send_receive, Method, Params}, From, State) ->
     #state{conn_pid = ConnPid, stream_ref = StreamRef} = State,
@@ -77,6 +72,8 @@ handle_cast({notify, Method, Params},
     Json = braidnode_jsonrpc:notification(Method, Params),
     ok = gun:ws_send(ConnPid, StreamRef, {binary, Json}),
     {noreply, State};
+handle_cast(connect, #state{conn_pid = undefined, connected = false}) ->
+    {noreply, init_connection()};
 handle_cast(_, S) ->
     {noreply, S}.
 
@@ -201,3 +198,19 @@ tls_opts() ->
         {cacertfile, "/mnt/certs/CA_certs.pem"},
         {verify, verify_peer}
     ].
+
+init_connection() ->
+    {ok, Domain} = application:get_env(braidnet_domain),
+    {ok, Port} = application:get_env(braidnet_port),
+    ContainerID = os:getenv("CID"),
+    GunOpts = #{
+        transport => tls,
+        protocols => [http],
+        tls_opts => tls_opts()
+    },
+    {ok, ConnPid} = gun:open(Domain, Port, GunOpts),
+    {ok, http} = gun:await_up(ConnPid, 5000),
+    StreamRef = gun:ws_upgrade(ConnPid, "/braidnode", #{id => ContainerID}),
+    % TODO: Need to do the node registration with Braidnet here,
+    %       to ensure that Braidnode is ready by the time the user app starts.
+    #state{conn_pid = ConnPid, stream_ref = StreamRef}.

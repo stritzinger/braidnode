@@ -15,5 +15,8 @@
   {modules, []},
 
   {licenses, ["Apache-2.0"]},
-  {links, []}
+  {links,
+    [{"Github", "https://github.com/Stritzinger/braidnode"},
+     {"Changelog", "https://github.com/Stritzinger/braidnode/blob/main/CHANGELOG.md"}
+  ]}
  ]}.

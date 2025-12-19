@@ -6,7 +6,7 @@
 -include_lib("public_key/include/public_key.hrl").
 
 -define(DEVICE_SERIAL_NUMBERS, "DEVICE_SERIAL_NUMBERS").
--define(ALWAYS_ALLOWED_NAMES, [<<"GRiSP2 CA">>]).
+-define(ALWAYS_ALLOWED_NAMES, [<<"GRiSP2 CA">>, <<"devices.seawater.local">>]).
 
 sign_fun(Msg, DigestType, Options) ->
     Result = braidnode_client:send_receive(sign, #{
@@ -52,7 +52,9 @@ verify_subject(DeviceSerials, OtpCert, State) ->
     end.
 
 gen_board_common_names(DeviceSerials) ->
-    [list_to_binary("GRiSP2 device " ++ N) || N <- string:split(DeviceSerials, ";", all)].
+    [list_to_binary("GRiSP2 device " ++ N) || N <- string:split(DeviceSerials, ";", all)]
+    ++
+    [list_to_binary("generic device " ++ N) || N <- string:split(DeviceSerials, ";", all)].
 
 get_common_name(OtpCert) ->
     Sub = OtpCert#'OTPCertificate'.tbsCertificate#'OTPTBSCertificate'.subject,

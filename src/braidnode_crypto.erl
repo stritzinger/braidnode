@@ -5,7 +5,7 @@
 
 -include_lib("public_key/include/public_key.hrl").
 
--define(DEVICE_SERIAL_NUMBERS, "DEVICE_SERIAL_NUMBERS").
+-define(DEVICE_IDENTIFIERS, "DEVICE_IDENTIFIERS").
 -define(ALWAYS_ALLOWED_NAMES, [<<"GRiSP2 CA">>, <<"devices.seawater.local">>]).
 
 sign_fun(Msg, DigestType, Options) ->
@@ -23,27 +23,24 @@ sign_fun(Msg, DigestType, Options) ->
     end.
 
 verify_fun(_OtpCert, {bad_cert, _} = Reason, _State) ->
-    % io:format("Verify fun FAILED~n"),
     {fail, Reason};
 verify_fun(_OtpCert, {extension, _E}, State) ->
-    % io:format("Verify fun extension~n"),
     {unknown, State};
 verify_fun(OtpCert, _Event, State) ->
-    % io:format("Verify fun Event~n"),
-    case os:getenv(?DEVICE_SERIAL_NUMBERS) of
+    case os:getenv(?DEVICE_IDENTIFIERS) of
         false ->
-            io:format("NO DEVICE_SERIAL_NUMBERS~n"),
+            io:format("NO DEVICE_IDENTIFIERS~n"),
             {valid, State};
-        DeviceSerials ->
-            verify_subject(DeviceSerials, OtpCert, State)
+        DeviceIdentifiers ->
+            verify_subject(DeviceIdentifiers, OtpCert, State)
     end.
 
-verify_subject(DeviceSerials, OtpCert, State) ->
-    BoardNames = gen_board_common_names(DeviceSerials),
-    AllowedCommonNames = BoardNames ++ ?ALWAYS_ALLOWED_NAMES,
-    % io:format("Allowed: ~p~n", [AllowedCommonNames]),
+%% Helper functions ------------------------------------------------------------
+
+verify_subject(DeviceIdentifiers, OtpCert, State) ->
+    DeviceNames = gen_device_cert_common_names(DeviceIdentifiers),
+    AllowedCommonNames = DeviceNames ++ ?ALWAYS_ALLOWED_NAMES,
     CommonName = get_common_name(OtpCert),
-    % io:format("CommonName: ~p~n", [CommonName]),
     case lists:member(CommonName, AllowedCommonNames) of
         true -> {valid, State};
         false ->
@@ -51,14 +48,15 @@ verify_subject(DeviceSerials, OtpCert, State) ->
             {fail, subject_not_allowed}
     end.
 
-gen_board_common_names(DeviceSerials) ->
-    [list_to_binary("GRiSP2 device " ++ N) || N <- string:split(DeviceSerials, ";", all)]
-    ++
-    [list_to_binary("generic device " ++ N) || N <- string:split(DeviceSerials, ";", all)].
+gen_device_cert_common_names(DeviceIdentifiers) ->
+    DeviceIdentifiersList = string:split(DeviceIdentifiers, ";", all),
+    PlatformAndSerialList = [string:split(Identifier, "-", all)
+                             || Identifier <- DeviceIdentifiersList],
+    [iolist_to_binary([Platform, " device ", Serial])
+     || [Platform, Serial] <- PlatformAndSerialList].
 
 get_common_name(OtpCert) ->
     Sub = OtpCert#'OTPCertificate'.tbsCertificate#'OTPTBSCertificate'.subject,
-    % io:format("Subject: ~p~n", [Sub]),
     {rdnSequence, [Attributes]} = Sub,
     [Name|_] = [
         Value

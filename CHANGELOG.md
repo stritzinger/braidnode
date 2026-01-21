@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-01-21
+### Added
+* Support for arbitrary "paltform" names as  device type in certificate verification.
+
 ## [1.0.1] - 2025-09-16
 ### Added
 * ExDoc configuration.
@@ -58,7 +62,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 * Initial release.
 
-[unreleased]: https://github.com/stritzinger/braidnode/compare/1.0.1...HEAD
+[unreleased]: https://github.com/stritzinger/braidnode/compare/1.2.0...HEAD
+[1.2.0]: https://github.com/stritzinger/braidnode/compare/1.0.1...1.2.0
 [1.0.1]: https://github.com/stritzinger/braidnode/compare/1.0.0...1.0.1
 [1.0.0]: https://github.com/stritzinger/braidnode/compare/0.2.0...1.0.0
 [0.2.0]: https://github.com/stritzinger/braidnode/compare/0.1.0...0.2.0

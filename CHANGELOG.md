@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.1] - 2026-10-28
+### Changed
+* Refresh the locked Gun dependency to 2.7.0 and Cowlib to 2.21.0.
+
 ## [1.2.0] - 2026-01-21
 ### Added
 * Support for arbitrary "paltform" names as  device type in certificate verification.
@@ -62,7 +66,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 * Initial release.
 
-[unreleased]: https://github.com/stritzinger/braidnode/compare/1.2.0...HEAD
+[unreleased]: https://github.com/stritzinger/braidnode/compare/1.2.1...HEAD
+[1.2.1]: https://github.com/stritzinger/braidnode/compare/1.2.0...1.2.1
 [1.2.0]: https://github.com/stritzinger/braidnode/compare/1.0.1...1.2.0
 [1.0.1]: https://github.com/stritzinger/braidnode/compare/1.0.0...1.0.1
 [1.0.0]: https://github.com/stritzinger/braidnode/compare/0.2.0...1.0.0
